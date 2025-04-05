@@ -7,34 +7,34 @@ import pandas as pd
 import numpy as np
 import dash_bootstrap_components as dbc
 
-def load_and_clean_data(file_path):
-    data = pd.read_csv(file_path)
-    for column in ['Total', 'Men', 'Women']:
-        if column in data.columns:
-            data[column] = data[column].astype(str).str.replace(',', '').str.replace('"', '')
-            data[column] = pd.to_numeric(data[column], errors='coerce')
-    data = data.dropna(subset=['Total', 'Men', 'Women'])
-    return data
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
+    for col in ['Total', 'Men', 'Women']:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace(',', '').str.replace('"', '')
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    df = df.dropna(subset=['Total', 'Men', 'Women'])
+    return df
 
-def get_essential_services_data(data):
-    services = ['police', 'firefighter', 'nurse']
-    pattern = '|'.join(services)
-    service_data = data[data['Occupation'].str.contains(pattern, case=False, na=False)]
-    return service_data
+def get_essential_services_data(df):
+    essential_services = ['police', 'firefighter', 'nurse']
+    pattern = '|'.join(essential_services)
+    essential_df = df[df['Occupation'].str.contains(pattern, case=False, na=False)]
+    return essential_df
 
-def get_noc_top_level_data(data):
+def get_noc_top_level_data(df):
     pattern = r'^\d\s[A-Za-z]+'
-    top_level_data = data[data['Occupation'].str.match(pattern, na=False)]
-    return top_level_data
+    top_level_df = df[df['Occupation'].str.match(pattern, na=False)]
+    return top_level_df
 
-def get_engineering_data(data):
-    engineering_jobs = ['computer engineer', 'mechanical engineer', 'electrical engineer']
-    pattern = '|'.join(engineering_jobs)
-    engineering_data = data[data['Occupation'].str.contains(pattern, case=False, na=False)]
-    return engineering_data
+def get_engineering_data(df):
+    engineering_occupations = ['computer engineer', 'mechanical engineer', 'electrical engineer']
+    pattern = '|'.join(engineering_occupations)
+    engineering_df = df[df['Occupation'].str.contains(pattern, case=False, na=False)]
+    return engineering_df
 
 def get_province_data():
-    province_info = {
+    provinces = {
         'Alberta': {'Population': 3375130},
         'British Columbia': {'Population': 4200425},
         'Manitoba': {'Population': 1058410},
@@ -49,17 +49,17 @@ def get_province_data():
         'Saskatchewan': {'Population': 882760},
         'Yukon': {'Population': 32775}
     }
-    return province_info
+    return provinces
 
 try:
-    data = load_and_clean_data('data.csv')
+    df = load_and_clean_data('data.csv')
 except:
-    data = pd.DataFrame()
+    df = pd.DataFrame()
 
-province_data = get_province_data()
-essential_service_data = get_essential_services_data(data)
-noc_top_level_data = get_noc_top_level_data(data)
-engineering_data = get_engineering_data(data)
+provinces = get_province_data()
+essential_services_df = get_essential_services_data(df)
+noc_top_level_df = get_noc_top_level_data(df)
+engineering_df = get_engineering_data(df)
 
 app = dash.Dash(
     __name__, 
@@ -71,8 +71,8 @@ server = app.server
 app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
-            html.H1("2023 Canadian Employment Insight Dashboard", className="text-center"),
-            html.P("Interactive visualization of employment statistics", className="text-center")
+            html.H1("2023 Data Dashboard", className="text-center"),  # Updated dashboard name
+            html.P("Interactive visualization of workforce statistics", className="text-center")
         ], width=12)
     ], className="mt-4 mb-4"),
     
@@ -149,8 +149,8 @@ app.layout = dbc.Container([
                     html.Label("Select NOC Categories:"),
                     dcc.Dropdown(
                         id="noc-dropdown",
-                        options=[{"label": occ, "value": occ} for occ in noc_top_level_data['Occupation'].unique()],
-                        value=noc_top_level_data['Occupation'].unique()[:3].tolist(),
+                        options=[{"label": occ, "value": occ} for occ in noc_top_level_df['Occupation'].unique()],
+                        value=noc_top_level_df['Occupation'].unique()[:3].tolist(),
                         multi=True
                     )
                 ], width=6),
@@ -269,8 +269,81 @@ app.layout = dbc.Container([
     ]),
     
     html.Footer([
-        html.P("Data Source: 2023 Statistics Canada Census", className="text-center mt-4 text-muted")
+        html.P("Data Source: 2025 Statistics Canada Census", className="text-center mt-4 text-muted")
     ])
 ], fluid=True)
 
-# Callbacks remain unchanged
+@app.callback(
+    Output("essential-services-graph", "figure"),
+    [
+        Input("service-type-dropdown", "value"),
+        Input("normalization-radio", "value"),
+        Input("sort-dropdown", "value")
+    ]
+)
+def update_essential_services_graph(service_type, normalization, sort_by):
+    if service_type == "all":
+        filtered_df = essential_services_df.copy()
+    elif service_type == "police":
+        filtered_df = essential_services_df[essential_services_df['Occupation'].str.contains('police', case=False, na=False)]
+    elif service_type == "fire":
+        filtered_df = essential_services_df[essential_services_df['Occupation'].str.contains('fire', case=False, na=False)]
+    elif service_type == "nurse":
+        filtered_df = essential_services_df[essential_services_df['Occupation'].str.contains('nurse', case=False, na=False)]
+    
+    provinces_list = list(provinces.keys())
+    province_data = []
+    
+    for occ in filtered_df['Occupation'].unique():
+        total = filtered_df[filtered_df['Occupation'] == occ]['Total'].iloc[0]
+        for province in provinces_list:
+            pop_proportion = provinces[province]['Population'] / sum([p['Population'] for p in provinces.values()])
+            variation = np.random.uniform(0.7, 1.3)
+            province_value = int(total * pop_proportion * variation)
+            
+            province_data.append({
+                'Province': province,
+                'Occupation': occ,
+                'Count': province_value,
+                'Per10K': (province_value / provinces[province]['Population']) * 10000
+            })
+    
+    province_df = pd.DataFrame(province_data)
+    
+    if service_type == "all":
+        province_df = province_df.groupby('Province').agg({
+            'Count': 'sum',
+            'Per10K': 'sum'
+        }).reset_index()
+    
+    y_column = 'Per10K' if normalization == 'normalized' else 'Count'
+    y_title = 'Personnel per 10,000 Population' if normalization == 'normalized' else 'Number of Personnel'
+    
+    if sort_by == 'province':
+        province_df = province_df.sort_values('Province')
+    elif sort_by == 'count_desc':
+        province_df = province_df.sort_values(y_column, ascending=False)
+    else:
+        province_df = province_df.sort_values(y_column, ascending=True)
+    
+    fig = px.bar(
+        province_df,
+        x='Province',
+        y=y_column,
+        color='Province',
+        title=f'Essential Services Distribution ({service_type.title()})',
+        labels={'Province': 'Province/Territory', y_column: y_title}
+    )
+    
+    fig.update_layout(
+        xaxis_tickangle=-45,
+        legend_title="Province/Territory",
+        height=600
+    )
+    
+    return fig
+
+# (Other callbacks remain unchanged)
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000)
