@@ -1,0 +1,1 @@
+web: jupyter nbconvert --to notebook --execute --inplace YOUR_NOTEBOOK_NAME.ipynb && python app.py
