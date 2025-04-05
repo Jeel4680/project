@@ -1,15 +1,13 @@
-# Dash Dashboard for Census Visualization (Google Colab Setup)
-
-!pip install dash dash-bootstrap-components jupyter-dash --quiet
+# app.py for Render Deployment
 
 import pandas as pd
 import dash
 from dash import dcc, html, Input, Output
 import plotly.express as px
-from jupyter_dash import JupyterDash
+import os
 
-# Load the dataset
-df = pd.read_csv('/mnt/data/data.csv')
+# Load the dataset (ensure data.csv is in the same directory on Render)
+df = pd.read_csv('data.csv')
 
 # Preprocess the data: remove commas and convert numeric columns to int
 df[['Total', 'Men', 'Women']] = df[['Total', 'Men', 'Women']].replace({',': ''}, regex=True).astype(int)
@@ -18,12 +16,11 @@ df[['Total', 'Men', 'Women']] = df[['Total', 'Men', 'Women']].replace({',': ''},
 df['NOC_Code'] = df['Occupation'].str.extract(r'^(\d)')
 
 # Initialize the app
-app = JupyterDash(__name__, external_stylesheets=['https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css'])
+app = dash.Dash(__name__, external_stylesheets=['https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css'])
 
 app.layout = html.Div([
     html.H1("Canada 2023 Census Dashboard", className="text-center my-4"),
 
-    # Gender distribution bar chart
     html.Div([
         html.H4("Employment by Gender"),
         dcc.RadioItems(
@@ -39,7 +36,6 @@ app.layout = html.Div([
         dcc.Graph(id='gender-bar')
     ], className="mb-5"),
 
-    # NOC Group distribution
     html.Div([
         html.H4("Employment by NOC Group (1-digit code)"),
         dcc.Dropdown(
@@ -54,7 +50,6 @@ app.layout = html.Div([
         dcc.Graph(id='noc-bar')
     ], className="mb-5"),
 
-    # Engineers employment
     html.Div([
         html.H4("Engineer-Related Occupations"),
         dcc.Graph(id='engineer-bar', figure=px.bar(
@@ -66,7 +61,6 @@ app.layout = html.Div([
         ))
     ], className="mb-5"),
 
-    # Custom insight chart (Top 10 occupations)
     html.Div([
         html.H4("Top 10 Occupations by Employment"),
         dcc.Graph(id='top10-bar', figure=px.bar(
@@ -79,7 +73,6 @@ app.layout = html.Div([
     ])
 ])
 
-# Callbacks
 @app.callback(
     Output('gender-bar', 'figure'),
     Input('gender-radio', 'value')
@@ -109,8 +102,7 @@ def update_noc_chart(noc_digit):
     )
     return fig
 
-# Run the app
-app.run_server(mode='inline', debug=False)
-
-# Add this to the first cell of your notebook:
-# [Video Demo Link Here]  <-- Replace with actual link when ready
+# Run the app on port 8080 for Render
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 8080))
+    app.run_server(debug=True, host='0.0.0.0', port=port)
