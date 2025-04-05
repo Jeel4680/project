@@ -1,5 +1,3 @@
-# app.py for Render Deployment
-
 import pandas as pd
 import dash
 from dash import dcc, html, Input, Output
@@ -72,6 +70,9 @@ app.layout = html.Div([
         ))
     ])
 ])
+
+# Ensure that Dash's Flask app is accessible via `server`
+server = app.server  # This is where the Flask server is exposed to Gunicorn
 
 @app.callback(
     Output('gender-bar', 'figure'),
